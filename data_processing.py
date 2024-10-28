@@ -6,7 +6,7 @@ import numpy as np
 import json
 
 from utils.data_processing import load_landmark_openface,compute_crop_radius
-from utils.deep_speech import DeepSpeech
+# from utils.deep_speech import DeepSpeech
 from config.config import DataProcessingOptions
 
 def extract_audio(source_video_dir,res_audio_dir):
@@ -45,6 +45,7 @@ def extract_video_frame(source_video_dir,res_video_frame_dir):
     '''
         extract video frames from videos
     '''
+    print('source_video_dir: ', source_video_dir)
     if not os.path.exists(source_video_dir):
         raise ('wrong path of video dir')
     if not os.path.exists(res_video_frame_dir):
@@ -67,7 +68,7 @@ def extract_video_frame(source_video_dir,res_video_frame_dir):
             cv2.imwrite(result_path, frame)
 
 
-def crop_face_according_openfaceLM(openface_landmark_dir,video_frame_dir,res_crop_face_dir,clip_length):
+def crop_face_according_openfaceLM(openface_landmark_dir,video_frame_dir,res_crop_face_dir):
     '''
       crop face according to openface landmark
     '''
@@ -84,41 +85,41 @@ def crop_face_according_openfaceLM(openface_landmark_dir,video_frame_dir,res_cro
         if not os.path.exists(crop_face_video_dir):
             os.makedirs(crop_face_video_dir)
         print('cropping face from video: {} ...'.format(video_name))
-        landmark_openface_data = load_landmark_openface(landmark_openface_path).astype(np.int)
+        landmark_openface_data = load_landmark_openface(landmark_openface_path).astype(np.int)  # 获取一个video对应的landmark
         frame_dir = os.path.join(video_frame_dir, video_name)
         if not os.path.exists(frame_dir):
             raise ('run last step to extract video frame')
         if len(glob.glob(os.path.join(frame_dir, '*.jpg'))) != landmark_openface_data.shape[0]:
             raise ('landmark length is different from frame length')
         frame_length = min(len(glob.glob(os.path.join(frame_dir, '*.jpg'))), landmark_openface_data.shape[0])
-        end_frame_index = list(range(clip_length, frame_length, clip_length))
-        video_clip_num = len(end_frame_index)
-        for i in range(video_clip_num):
-            first_image = cv2.imread(os.path.join(frame_dir, '000000.jpg'))
-            video_h,video_w = first_image.shape[0], first_image.shape[1]
-            crop_flag, radius_clip = compute_crop_radius((video_w,video_h),
-                                    landmark_openface_data[end_frame_index[i] - clip_length:end_frame_index[i], :,:])
-            if not crop_flag:
+        # end_frame_index = list(range(clip_length, frame_length, clip_length))
+
+        first_image = cv2.imread(os.path.join(frame_dir, '000000.jpg'))
+        video_h,video_w = first_image.shape[0], first_image.shape[1]    # 获取原视频大小
+        crop_flag, radius_clip = compute_crop_radius((video_w,video_h), landmark_openface_data[0:10, :,:])
+        if not crop_flag:
+            continue
+
+        radius_clip_1_4 = radius_clip // 4
+
+        # radius_clip 是一半脸大小多一点，radius_clip_1_4是一半的 1 /4
+        for frame_index in range(frame_length):
+            res_crop_face_frame_path = os.path.join(crop_face_video_dir, str(frame_index).zfill(6) + '.jpg')
+            if os.path.exists(res_crop_face_frame_path):
                 continue
-            radius_clip_1_4 = radius_clip // 4
-            print('cropping {}/{} clip from video:{}'.format(i, video_clip_num, video_name))
-            res_face_clip_dir = os.path.join(crop_face_video_dir, str(i).zfill(6))
-            if not os.path.exists(res_face_clip_dir):
-                os.mkdir(res_face_clip_dir)
-            for frame_index in range(end_frame_index[i]- clip_length,end_frame_index[i]):
+
+            try:
                 source_frame_path = os.path.join(frame_dir,str(frame_index).zfill(6)+'.jpg')
                 source_frame_data = cv2.imread(source_frame_path)
                 frame_landmark = landmark_openface_data[frame_index, :, :]
-                crop_face_data = source_frame_data[
-                                    frame_landmark[29, 1] - radius_clip:frame_landmark[
-                                                                            29, 1] + radius_clip * 2 + radius_clip_1_4,
-                                    frame_landmark[33, 0] - radius_clip - radius_clip_1_4:frame_landmark[
-                                                                                              33, 0] + radius_clip + radius_clip_1_4,
-                                    :].copy()
-                res_crop_face_frame_path = os.path.join(res_face_clip_dir, str(frame_index).zfill(6) + '.jpg')
-                if os.path.exists(res_crop_face_frame_path):
-                    os.remove(res_crop_face_frame_path)
+                crop_face_data = source_frame_data[frame_landmark[29, 1] - radius_clip:frame_landmark[29, 1] + radius_clip * 2 + radius_clip_1_4,
+                                    frame_landmark[33, 0] - radius_clip - radius_clip_1_4:frame_landmark[33, 0] + radius_clip + radius_clip_1_4,:].copy()
+
+                # if os.path.exists(res_crop_face_frame_path):
+                #     os.remove(res_crop_face_frame_path)
                 cv2.imwrite(res_crop_face_frame_path, crop_face_data)
+            except:
+                print('crop face error:{}'.format(source_frame_path))
 
 
 def generate_training_json(crop_face_dir,deep_speech_dir,clip_length,res_json_path):
@@ -156,6 +157,7 @@ def generate_training_json(crop_face_dir,deep_speech_dir,clip_length,res_json_pa
             tem_tem_dic['deep_speech_list'] = deep_speech_list
             clip_data_list.append(tem_tem_dic)
         tem_dic['video_clip_num'] = video_clip_num
+        print('video_clip_num: ', video_clip_num)
         tem_dic['clip_data_list'] = clip_data_list
         res_data_dic[video_name] = tem_dic
     if os.path.exists(res_json_path):
@@ -177,9 +179,7 @@ if __name__ == '__main__':
         extract_deep_speech(opt.audio_dir, opt.deep_speech_dir,opt.deep_speech_model)
     ##########  step4: crop face images
     if opt.crop_face:
-        crop_face_according_openfaceLM(opt.openface_landmark_dir,opt.video_frame_dir,opt.crop_face_dir,opt.clip_length)
+        crop_face_according_openfaceLM(opt.openface_landmark_dir, opt.video_frame_dir, opt.crop_face_dir)
     ##########  step5: generate training json file
     if opt.generate_training_json:
         generate_training_json(opt.crop_face_dir,opt.deep_speech_dir,opt.clip_length,opt.json_path)
-
-
