@@ -176,11 +176,13 @@ if __name__ == '__main__':
 
     crop_flag, crop_radius = compute_crop_radius(video_size,res_video_landmark_data_pad[5:10, :, :])
 
+    ref_index_list = random.sample(range(2, len(res_video_frame_path_list_pad) - 2), 5)
+
     for clip_end_index in range(2, pad_length - 2, 1):
         ############################################## randomly select 5 reference images ##############################################
         print('selecting five reference images')
         ref_img_list = []
-        ref_index_list = range(clip_end_index - 2, clip_end_index + 3)
+        # ref_index_list = range(clip_end_index - 2, clip_end_index + 3)
         # ref_index_list = [i for i in ref_index_list]
         # random.shuffle(ref_index_list)
 
