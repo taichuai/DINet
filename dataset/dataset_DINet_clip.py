@@ -32,7 +32,6 @@ def get_data(group_names, data_dirs, augment_nums=None, lest_video_frames=25, mo
             data = f.readlines()
             data = data * augment_num
 
-        # crop_frames_path = os.path.join(os.path.dirname(file_path), '3dmm_crop_frames')
         cropped_frame_dir = os.path.join(group_dir, 'dinet_frames_cropped')
         hubert_npys_dir = os.path.join(group_dir, 'hubert_npys')
 
