@@ -10,7 +10,7 @@ from collections import defaultdict
 import glob
 
 
-def get_data(group_names, data_dirs, augment_nums=None, lest_video_frames=25, mode='train', bad_file_list=None):
+def get_data(group_names, data_dirs, augment_nums=None, lest_video_frames=25, mode='train'):
     data_dic_name_list = []
     speaker_name_list = []
     data_dic = defaultdict()
@@ -37,18 +37,10 @@ def get_data(group_names, data_dirs, augment_nums=None, lest_video_frames=25, mo
         hubert_npys_dir = os.path.join(group_dir, 'hubert_npys')
 
         for line in tqdm(data):
-            if 'angry' in line or 'disgusted' in line or 'fear' in line or 'sad' in line or 'contempt' in line:
-                continue
-
-            if '_top_' in line or '_down_' in line:
-                continue
-
             prefix = line.strip()
 
             crop_frames_path = os.path.join(cropped_frame_dir, prefix)
             hubert_npy_path = os.path.join(hubert_npys_dir, prefix + '_hu.npy')
-
-            # hubert_npy_path = os.path.join(hubert_npys_dir, prefix + '_wlm.npy')
 
             if not os.path.exists(crop_frames_path) or not os.path.exists(hubert_npy_path):
                 print('{} not exist'.format(prefix))
@@ -70,9 +62,6 @@ def get_data(group_names, data_dirs, augment_nums=None, lest_video_frames=25, mo
                     continue
 
                 key_str = group_name + '|' + prefix
-                if bad_file_list is not None and key_str in bad_file_list:
-                    # print('====bad case, skip====')
-                    continue
 
                 speaker_name = prefix.split('_')[:-1]
                 speaker_name = '_'.join(speaker_name)
@@ -208,9 +197,6 @@ class DINetDataset(Dataset):
 
             ## load deep speech feature
             hubert_feature = np.load(hubert_npy_path)
-            # print('hubert_feature: ', hubert_feature.shape)
-            # print('src_select_idx: ', src_select_idx)
-            # print('frame_num: ', frame_num)
             hubert_feature = self.get_audio_features(hubert_feature, src_select_idx * 2)
             
             source_clip_list.append(source_image_data)
