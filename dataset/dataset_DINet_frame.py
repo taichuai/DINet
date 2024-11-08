@@ -188,6 +188,11 @@ class DINetDataset(Dataset):
         ## load reference images
         reference_frame_data_list = []
         for reference_anchor in ref_indexex:
+            if reference_anchor < (-1 * frame_num + 1):
+                reference_anchor = 0
+            elif reference_anchor > frame_num - 1:
+                reference_anchor = frame_num - 1
+
             reference_frame_path = ori_image_list[reference_anchor]
             reference_frame_data = cv2.imread(reference_frame_path)[:, :, ::-1]
             reference_frame_data = cv2.resize(reference_frame_data, (self.img_w, self.img_h)) / 255.0
