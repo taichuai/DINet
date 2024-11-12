@@ -180,7 +180,7 @@ if __name__ == "__main__":
             source_frame = source_image_data.permute(0,2,3,1)[0]*255
 
             # if epoch > 5:
-            if opt.coarse2fine or epoch > 5:
+            if opt.coarse2fine or epoch > 20:
                 try:
                     source_preds = fa.get_landmarks(source_frame)
                     out_preds = fa.get_landmarks(out_frame)
