@@ -29,7 +29,7 @@ def cosine_loss(a, v, y):
 
     return loss
 
-# 跟batch_size有关，得调
+
 def info_nce_loss(audio_features, img_features, temperature=0.1):
         # 计算相似度矩阵
         sim_matrix = torch.matmul(audio_features, img_features.T) / temperature
@@ -78,9 +78,8 @@ if __name__ == "__main__":
     # setup optimizer
     optimizer_g = optim.Adam(net_g.parameters(), lr=opt.lr_g)
     optimizer_dI = optim.Adam(net_dI.parameters(), lr=opt.lr_dI)
-    
-    writer = SummaryWriter(log_dir=os.path.join(opt.result_path, 'logs_DINet'))
 
+    writer = SummaryWriter(log_dir=os.path.join(opt.result_path, 'logs_DINet'))
     use_syncnet = True
 
     # coarse2fine
@@ -96,6 +95,7 @@ if __name__ == "__main__":
         #         name = 'module.' + k   # remove module.
         #     else:
         #         name = k
+
         #     new_state_dict[name] = v
 
         # net_g.load_state_dict(new_state_dict)
@@ -112,7 +112,7 @@ if __name__ == "__main__":
     criterionGAN = GANLoss().cuda()
     criterionL1 = nn.L1Loss().cuda()
     # l1 loss
-    recon_loss = nn.L1Loss()
+    recon_loss = nn.L1Loss().cuda()
 
     # set scheduler
     net_g_scheduler = get_scheduler(optimizer_g, opt.non_decay, opt.decay)
@@ -169,26 +169,30 @@ if __name__ == "__main__":
             perception_fake_half = net_vgg(fake_out_half)
             loss_g_perception = 0
             # l1 recon_loss
-            # l1_recon_loss = recon_loss(source_image_data, fake_out) * 10
+            l1_recon_loss = recon_loss(source_image_data, fake_out) * 10
 
-            l1_recon_loss = torch.tensor(0.0)
+            # l1_recon_loss = torch.tensor(0.0)
 
             # landmark loss
             # out_frame = fake_out.permute(0,2,3,1)[0].detach().cpu().numpy()*255
             # source_frame = source_clip.permute(0,2,3,1)[0].detach().cpu().numpy()*255
-            out_frame = fake_out.permute(0,2,3,1)[0]*255
-            source_frame = source_image_data.permute(0,2,3,1)[0]*255
 
             # if epoch > 5:
-            if opt.coarse2fine or epoch > 20:
+            if opt.coarse2fine or epoch > 15:
+                loss_lmks = torch.tensor(0.0)
                 try:
-                    source_preds = fa.get_landmarks(source_frame)
-                    out_preds = fa.get_landmarks(out_frame)
-                    tensor_source_lmks = torch.tensor(source_preds[0])
-                    tensor_out_lmks = torch.tensor(out_preds[0])
-                    loss_lmks = criterionL1(tensor_out_lmks, tensor_source_lmks) * 0.1
+                    for land_i in range(fake_out.shape[0]):
+                        out_frame = fake_out.permute(0,2,3,1)[land_i]*255
+                        source_frame = source_image_data.permute(0,2,3,1)[land_i]*255    
+                        source_preds = fa.get_landmarks(source_frame)
+                        out_preds = fa.get_landmarks(out_frame)
+                        tensor_source_lmks = torch.tensor(source_preds[0])
+                        tensor_out_lmks = torch.tensor(out_preds[0])
+                        loss_lmks += (criterionL1(tensor_out_lmks, tensor_source_lmks) * 0.2)
                 except:
-                    loss_lmks = torch.tensor(0.0)
+                        loss_lmks += torch.tensor(0.0)
+
+                loss_lmks = loss_lmks / fake_out.shape[0]
 
                 if use_syncnet:
                     fake_out_clip_mouth = fake_out[:, :, train_data.radius:train_data.radius + train_data.mouth_region_size,
@@ -196,10 +200,10 @@ if __name__ == "__main__":
                     y = torch.ones([deepspeech_feature.shape[0],1]).float().cuda()
                     audio_features, img_features = syncnet(fake_out_clip_mouth, deepspeech_feature.permute(0, 2, 1))
                     cos_loss = cosine_loss(audio_features, img_features, y)
-                    info_loss = info_nce_loss(audio_features, img_features)
+                    info_loss = info_nce_loss(audio_features, img_features) * 0.5
                     # print('cos_loss: ', cos_loss.item(), 'info_loss: ', info_loss.item())
-                    # sync_loss = 0.1 * cos_loss + info_loss
-                    sync_loss = info_loss
+                    sync_loss = (0.1 * cos_loss + info_loss)
+                    # sync_loss = info_loss
                 else:
                     sync_loss = torch.tensor(0.0)
 
@@ -218,7 +222,7 @@ if __name__ == "__main__":
             loss_g_dI = criterionGAN(pred_fake_dI, True)
             # combine perception loss and gan loss
             # loss_g =  loss_g_perception + loss_g_dI + l1_recon_loss
-            loss_g =  loss_g_perception + loss_g_dI + loss_lmks
+            loss_g =  loss_g_perception + loss_g_dI + loss_lmks + l1_recon_loss
 
             if use_syncnet:
                 loss_g += sync_loss
@@ -235,14 +239,13 @@ if __name__ == "__main__":
 
             time_cost = time.time() - time_
             print(
-                "===> Epoch[{}-{}]({}/{}): loss_g:{:.4f},  l1_recon_loss:{:.3f}, Loss_DI: {:.4f} Loss_GI: {:.4f} Loss_sync: {:.4f} Loss_perception: {:.4f} Loss_lmks: {:.4f} lr_g = {:.7f} time_cost_per_step: {:.2f}s/it".format(
+                "===> Epoch[{}:{}]({}/{}): loss_g:{:.4f},  l1_recon_loss:{:.3f}, Loss_DI: {:.4f} Loss_GI: {:.4f} Loss_sync: {:.4f} Loss_perception: {:.4f} Loss_lmks: {:.4f} lr_g = {:.7f} time_cost_per_step: {:.2f}s/it".format(
                     epoch, total_iteration, iteration, len(training_data_loader), float(loss_g.item()), float(l1_recon_loss.item()), float(loss_dI), float(loss_g_dI), float(sync_loss.item()),  float(loss_g_perception), float(loss_lmks.item()),optimizer_g.param_groups[0]['lr'], time_cost))
 
             time_ = time.time()
 
             total_iteration += 1
 
-            # add log
             if total_iteration % 5000 == 0:
                 writer.add_scalar('Loss/G', loss_g.item(), total_iteration)
                 writer.add_scalar('Loss/DI', loss_dI.item(), total_iteration)
