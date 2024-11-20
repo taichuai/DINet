@@ -59,25 +59,13 @@ We split the training process into **frame training stage** and **clip training 
 #### Frame training stage.
 In frame training stage, we only use perception loss and GAN loss.
 
- 1. Firstly, train the DINet in 104x80 (mouth region is 64x64) resolution. Run 
-   ```python 
-python train_DINet_frame.py --augment_num=32 --mouth_region_size=64 --batch_size=24 --result_path=./asserts/training_model_weight/frame_training_64
-```
-You can stop the training when the loss converges (we stop in about 270 epoch).
-
- 2. Loading the pretrained model (face:104x80 & mouth:64x64) and train the DINet in higher resolution (face:208x160 & mouth:128x128). Run
-   ```python 
-python train_DINet_frame.py --augment_num=100 --mouth_region_size=128 --batch_size=80 --coarse2fine --coarse_model_path=./asserts/training_model_weight/frame_training_64/xxxxxx.pth --result_path=./asserts/training_model_weight/frame_training_128
-```
-You can stop the training when the loss converges (we stop in about 200 epoch).
-
- 3. Loading the pretrained model (face:208x160 & mouth:128x128) and train the DINet in higher resolution (face:416x320 & mouth:256x256). Run
+ 1. Firstly, train the DINet in higher resolution (face:416x320 & mouth:256x256). Run
    ```python 
 python train_DINet_frame.py --augment_num=20 --mouth_region_size=256 --batch_size=12 --coarse2fine --coarse_model_path=./asserts/training_model_weight/frame_training_128/xxxxxx.pth --result_path=./asserts/training_model_weight/frame_training_256
 ```
 You can stop the training when the loss converges (we stop in about 200 epoch).
 
-#### Clip training stage.
+#### Clip training stage. (this stage can enhance the stability and smoothness of model generation, reducing video jitter.)
 In clip training stage, we use perception loss, frame/clip GAN loss and sync loss. Loading the pretrained frame model (face:416x320 & mouth:256x256), pretrained syncnet model (mouth:256x256) and train the DINet in clip setting. Run
    ```python 
 python train_DINet_clip.py --augment_num=3 --mouth_region_size=256 --batch_size=3 --pretrained_syncnet_path=./asserts/syncnet_256mouth.pth --pretrained_frame_DINet_path=./asserts/training_model_weight/frame_training_256/xxxxx.pth --result_path=./asserts/training_model_weight/clip_training_256
