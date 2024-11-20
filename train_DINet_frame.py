@@ -169,7 +169,7 @@ if __name__ == "__main__":
             perception_fake_half = net_vgg(fake_out_half)
             loss_g_perception = 0
             # l1 recon_loss
-            l1_recon_loss = recon_loss(source_image_data, fake_out) * 10
+            l1_recon_loss = recon_loss(source_image_data, fake_out) * 2
 
             # l1_recon_loss = torch.tensor(0.0)
 
