@@ -130,7 +130,40 @@ class DINetDataset(Dataset):
 
         print('img_h: ', self.img_h)
         print('img_w: ', self.img_w)
+        patch_size=16
+        mask_ratio=0.2
+        self.patch_size = patch_size
+        self.mask_ratio = mask_ratio
+        self.mask_patch = True
 
+    def random_masking_single_image(self, x_numpy):
+        """
+        对单张图像进行随机patch masking
+        x_numpy: [H, W, C] numpy array
+        return: [H, W, C] numpy array
+        """
+        H, W, C = x_numpy.shape
+        num_patches_h = H // self.patch_size
+        num_patches_w = W // self.patch_size
+        num_patches = num_patches_h * num_patches_w
+        num_mask = int(num_patches * self.mask_ratio)
+        
+        # 生成patch级别的mask
+        mask = np.zeros(num_patches, dtype=bool)
+        mask_indices = np.random.choice(num_patches, num_mask, replace=False)
+        mask[mask_indices] = True
+        mask = mask.reshape(num_patches_h, num_patches_w)
+        
+        # 扩展mask到像素级别
+        pixel_mask = np.repeat(np.repeat(mask, self.patch_size, axis=0), self.patch_size, axis=1)
+        pixel_mask = np.expand_dims(pixel_mask, axis=-1)
+        pixel_mask = np.repeat(pixel_mask, C, axis=2)
+        
+        # 应用mask
+        x_masked = x_numpy.copy()
+        x_masked[pixel_mask] = 0.0
+        
+        return x_masked
 
     def get_audio_features(self, features, index):
         # print('features: ', features.shape, 'index: ', index)
@@ -196,6 +229,11 @@ class DINetDataset(Dataset):
             reference_frame_path = ori_image_list[reference_anchor]
             reference_frame_data = cv2.imread(reference_frame_path)[:, :, ::-1]
             reference_frame_data = cv2.resize(reference_frame_data, (self.img_w, self.img_h)) / 255.0
+            
+            # 对每个reference图像单独进行mask
+            if self.mask_patch and random.random() < 0.5:
+                reference_frame_data = self.random_masking_single_image(reference_frame_data)
+
             reference_frame_data_list.append(reference_frame_data)
 
         reference_clip_data = np.concatenate(reference_frame_data_list, 2)
