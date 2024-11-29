@@ -130,8 +130,8 @@ class DINetDataset(Dataset):
 
         print('img_h: ', self.img_h)
         print('img_w: ', self.img_w)
-        patch_size=16
-        mask_ratio=0.2
+        patch_size=8
+        mask_ratio=0.1
         self.patch_size = patch_size
         self.mask_ratio = mask_ratio
         self.mask_patch = True
@@ -231,7 +231,7 @@ class DINetDataset(Dataset):
             reference_frame_data = cv2.resize(reference_frame_data, (self.img_w, self.img_h)) / 255.0
             
             # 对每个reference图像单独进行mask
-            if self.mask_patch and random.random() < 0.5:
+            if self.mask_patch and random.random() < 0.2:
                 reference_frame_data = self.random_masking_single_image(reference_frame_data)
 
             reference_frame_data_list.append(reference_frame_data)
