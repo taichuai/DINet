@@ -178,21 +178,23 @@ if __name__ == "__main__":
             # source_frame = source_clip.permute(0,2,3,1)[0].detach().cpu().numpy()*255
 
             # if epoch > 5:
-            if opt.coarse2fine or epoch > 15:
+            if True:
                 loss_lmks = torch.tensor(0.0)
                 try:
-                    for land_i in range(fake_out.shape[0]):
-                        out_frame = fake_out.permute(0,2,3,1)[land_i]*255
-                        source_frame = source_image_data.permute(0,2,3,1)[land_i]*255    
-                        source_preds = fa.get_landmarks(source_frame)
-                        out_preds = fa.get_landmarks(out_frame)
-                        tensor_source_lmks = torch.tensor(source_preds[0])
-                        tensor_out_lmks = torch.tensor(out_preds[0])
-                        loss_lmks += (criterionL1(tensor_out_lmks, tensor_source_lmks) * 0.2)
+                    # for land_i in range(fake_out.shape[0]):
+                    #     out_frame = fake_out.permute(0,2,3,1)[land_i]*255
+                    #     source_frame = source_image_data.permute(0,2,3,1)[land_i]*255
+                    out_frame = fake_out.permute(0,2,3,1)[0].detach().cpu().numpy()*255
+                    source_frame = source_image_data.permute(0,2,3,1)[0].detach().cpu().numpy()*255
+                    source_preds = fa.get_landmarks(source_frame)
+                    out_preds = fa.get_landmarks(out_frame)
+                    tensor_source_lmks = torch.tensor(source_preds[0])[48:68]
+                    tensor_out_lmks = torch.tensor(out_preds[0])[48:68]
+                    loss_lmks += (criterionL1(tensor_out_lmks, tensor_source_lmks) * 0.2)
                 except:
                         loss_lmks += torch.tensor(0.0)
 
-                loss_lmks = loss_lmks / fake_out.shape[0]
+                # loss_lmks = loss_lmks / fake_out.shape[0]
 
                 if use_syncnet:
                     fake_out_clip_mouth = fake_out[:, :, train_data.radius:train_data.radius + train_data.mouth_region_size,
@@ -200,14 +202,17 @@ if __name__ == "__main__":
                     y = torch.ones([deepspeech_feature.shape[0],1]).float().cuda()
                     audio_features, img_features = syncnet(fake_out_clip_mouth, deepspeech_feature.permute(0, 2, 1))
                     cos_loss = cosine_loss(audio_features, img_features, y)
-                    info_loss = info_nce_loss(audio_features, img_features) * 0.5
+                    info_loss = info_nce_loss(audio_features, img_features) * 0.25
                     # print('cos_loss: ', cos_loss.item(), 'info_loss: ', info_loss.item())
                     sync_loss = (0.1 * cos_loss + info_loss)
                     # sync_loss = info_loss
                 else:
                     sync_loss = torch.tensor(0.0)
 
+                l1_recon_loss = recon_loss(source_image_data, fake_out)
+
             else:
+                l1_recon_loss = recon_loss(source_image_data, fake_out)
                 loss_lmks = torch.tensor(0.0)
                 sync_loss = torch.tensor(0.0)
 
