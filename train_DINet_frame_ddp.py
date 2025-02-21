@@ -272,11 +272,13 @@ if __name__ == "__main__":
             optimizer_g.step()
 
             time_cost = time.time() - time_
-            print(
-                "===> Epoch[{}:{}]({}/{}): loss_g:{:.4f},  l1_recon_loss:{:.3f}, Loss_DI: {:.4f} Loss_GI: {:.4f} Loss_sync: {:.4f} Loss_perception: {:.4f} Loss_lmks: {:.4f} lr_g = {:.7f} time_cost_per_step: {:.2f}s/it".format(
-                    epoch, total_iteration, iteration, len(training_data_loader), float(loss_g.item()), float(l1_recon_loss.item()), float(loss_dI), float(loss_g_dI), float(sync_loss.item()),  float(loss_g_perception), float(loss_lmks.item()),optimizer_g.param_groups[0]['lr'], time_cost))
+            if iteration % 2 == 0 and dist.get_rank() == 0:
+                print(
+                    "===> Epoch[{}:{}]({}/{}): loss_g:{:.4f},  l1_recon_loss:{:.3f}, Loss_DI: {:.4f} Loss_GI: {:.4f} Loss_sync: {:.4f} Loss_perception: {:.4f} Loss_lmks: {:.4f} lr_g = {:.7f} time_cost_per_step: {:.2f}s/it".format(
+                        epoch, total_iteration, iteration, len(training_data_loader), float(loss_g.item()), float(l1_recon_loss.item()), float(loss_dI), float(loss_g_dI), float(sync_loss.item()),  float(loss_g_perception), float(loss_lmks.item()),optimizer_g.param_groups[0]['lr'], time_cost))
 
             time_ = time.time()
+
 
             total_iteration += 1
 
