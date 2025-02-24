@@ -8,6 +8,7 @@ from tqdm import tqdm
 from torch.utils.data import Dataset
 from collections import defaultdict
 import glob
+from torchvision import transforms
 
 
 def get_data(group_names, data_dirs, augment_nums=None, lest_video_frames=25, mode='train'):
@@ -134,7 +135,13 @@ class DINetDataset(Dataset):
         mask_ratio=0.1
         self.patch_size = patch_size
         self.mask_ratio = mask_ratio
-        self.mask_patch = True
+        self.mask_patch = False
+
+        self.aug_trans = transforms.Compose([
+            # transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.1, hue=0.05)
+             transforms.ColorJitter(brightness=0.15, contrast=0.1, saturation=0.10, hue=0.1)
+        ])
+        self.aug_imgs_flags = True
 
     def random_masking_single_image(self, x_numpy):
         """
@@ -236,14 +243,30 @@ class DINetDataset(Dataset):
 
             reference_frame_data_list.append(reference_frame_data)
 
-        reference_clip_data = np.concatenate(reference_frame_data_list, 2)
+        if self.aug_imgs_flags:
+            reference_frame_data_list.append(source_image_data)
+            reference_frame_data_list.append(source_image_mask)
+            aug_frame_data = np.stack(reference_frame_data_list, 0)
+            # print('aug_frame_data: ', aug_frame_data.shape)
+            aug_frame_data = torch.from_numpy(aug_frame_data).float().permute(0, 3, 1, 2)
+            aug_frame_data_ = self.aug_trans(aug_frame_data)
+            rf1, rf2, rf3, rf4, rf5, source_image_data, source_image_mask = aug_frame_data_[0], aug_frame_data_[1], aug_frame_data_[2], aug_frame_data_[3], \
+                aug_frame_data_[4], aug_frame_data_[5], aug_frame_data_[6]
+            reference_clip_data = torch.cat([rf1, rf2, rf3, rf4, rf5], 0)
 
-        # # to tensor
-        source_image_data = torch.from_numpy(source_image_data).float().permute(2,0,1)
-        source_image_mask = torch.from_numpy(source_image_mask).float().permute(2,0,1)
-        reference_clip_data = torch.from_numpy(reference_clip_data).float().permute(2,0,1)
+        else:
+            reference_clip_data = np.concatenate(reference_frame_data_list, 2)
+            # # to tensor
+            source_image_data = torch.from_numpy(source_image_data).float().permute(2,0,1)
+            source_image_mask = torch.from_numpy(source_image_mask).float().permute(2,0,1)
+            reference_clip_data = torch.from_numpy(reference_clip_data).float().permute(2,0,1)
+
         hubert_feature = torch.from_numpy(hubert_feature).float().permute(1,0)
         mouse_mask = torch.from_numpy(mouse_mask).bool().permute(2,0,1)
+
+        # print('source_image_data: ', source_image_data.shape)
+        # print('source_image_mask: ', source_image_mask.shape)
+        # print('reference_clip_data: ', reference_clip_data.shape)
 
         return source_image_data, source_image_mask, reference_clip_data, hubert_feature, mouse_mask
 
